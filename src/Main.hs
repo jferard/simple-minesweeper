@@ -8,6 +8,7 @@ import System.Process
 import Data.Char
 import GHC.IO.Exception
 import System.Random
+import qualified Graphics.UI.Gtk as Gtk
 
 -- cells are masked (blank, or with a question mark or a cross) or unmasked. 
 data Cell = Masked | Question | Cross | Unmasked 
@@ -86,7 +87,7 @@ unmask bombGrid  maskGrid (r, c) = let grid = set maskGrid (r, c) Unmasked in ca
             neighbors grid = filter (\ (nr,nc) -> 0 <= nr && nr < 10 && 0<= nc && nc < 10 && (grid !! nr) !! nc /= Unmasked) allNeighbors
     _ -> grid
 
--- set a value in a grid    
+-- set a value in a grid
 set :: [[a]] -> (Int, Int) -> a -> [[a]]
 set grid (r, c) value = befRows ++ [setInRow row c value] ++ aftRows
     where 
@@ -103,14 +104,14 @@ createBombsCoordinates x n = [(1,2), (4,6), (4,7), (5,5), (9,8), (3,3), (4,2)]
 -}    
 createBombsCoordinates gen' count = createBombsCoordinates' gen' count []
     where 
-	createBombsCoordinates' :: StdGen -> Int -> [(Int, Int)] -> [(Int, Int)]
-        createBombsCoordinates' _ 0 coords = coords
-        createBombsCoordinates' g n coords = if (r, c) `elem` coords then createBombsCoordinates' g'' n coords else createBombsCoordinates' g'' (n-1) ((r, c):coords)
-            where 
-		r :: Int
-		c :: Int
-                (r, g') = randomR (0,9) g
-                (c, g'') = randomR (0,9) g'
+    createBombsCoordinates' :: StdGen -> Int -> [(Int, Int)] -> [(Int, Int)]
+    createBombsCoordinates' _ 0 coords = coords
+    createBombsCoordinates' g n coords = if (r, c) `elem` coords then createBombsCoordinates' g'' n coords else createBombsCoordinates' g'' (n-1) ((r, c):coords)
+        where
+            r :: Int
+            c :: Int
+            (r, g') = randomR (0,9) g
+            (c, g'') = randomR (0,9) g'
 
 
 -- given a height and a width, create a bomb grid : -1 is a bomb, n >=0 is the number of bombs in the neighborhood
@@ -131,7 +132,27 @@ createMaskGrid h w = [[Masked | c <- [0..(w-1)]]| r <- [0..h-1]]
 
 -- let's start.
 main :: IO ()    
-main = do 
+main = do
+    Gtk.initGUI
+    window <- Gtk.windowNew
+    Gtk.onDestroy window Gtk.mainQuit
+    Gtk.set window [
+       Gtk.containerBorderWidth Gtk.:= 10,
+       Gtk.windowDefaultWidth Gtk.:= 350,
+       Gtk.windowTitle Gtk.:= "Simple Minesweeper (J. Férard)" ]
+    mainbox <- Gtk.vBoxNew False 10
+    button <- Gtk.buttonNew
+    Gtk.set button [ Gtk.buttonLabel Gtk.:= "Ok" ]
+    Gtk.onClicked button $ do
+        Gtk.widgetDestroy window
+
+    msg <- Gtk.labelNew (Just "A GTK version is under development.")
+    Gtk.containerAdd mainbox msg
+    Gtk.containerAdd mainbox button
+    Gtk.containerAdd window mainbox
+    Gtk.widgetShowAll window
+    Gtk.mainGUI
+
     gen <- getStdGen
     let (count, gen') = randomR (10,30) gen
 {-
