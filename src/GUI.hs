@@ -50,28 +50,50 @@ renderBoard :: EventM EExpose Bool
 renderBoard = do
     dw      <- eventWindow
     region  <- eventRegion >>= liftIO . regionGetRectangles
-    liftIO . renderWithDrawable dw $ do { renderCell 0 0 1 Masked }
+    liftIO . renderWithDrawable dw $ do
+        renderCell 0 0 1 Masked
+        renderCell 0 1 1 Question
+        renderCell 0 2 1 BaseTypes.Cross
+        renderCell 0 3 0 Unmasked
+        renderCell 0 4 (-1) Unmasked
+        renderCell 0 5 5 Unmasked
     return True
 
 
 renderCell :: Double -> Double -> Int -> Cell -> Render ()
-renderCell = renderCellOfSize 15
+renderCell = renderCellOfSize 20
 
 renderCellOfSize :: Double -> Double -> Double -> Int -> Cell -> Render ()
-renderCellOfSize size r c bomb mask =
-    let x = c*size
-        y = r*size
-    in do
-        setLineWidth 2
+renderCellOfSize size r c bomb mask = do
+    setSourceRGB 0 0 0
+    moveTo (c*size+size*0.30) (r*size+size*0.75)
+    showText $ showCell bomb mask
+    renderTile size r c
 
-        setSourceRGB 0 0 0
-        moveTo (x+size-1) y
-        lineTo x y
-        lineTo x (y+size-1)
-        stroke
+    where
+        renderTile :: Double -> Double -> Double -> Render()
+        renderTile size r c =
+            let x = c*size
+                y = r*size
+            in do
+                setLineWidth 2
 
-        setSourceRGB 0.5 0.5 0.5
-        moveTo x (y+size-1)
-        lineTo (x+size-1) (y+size-1)
-        lineTo (x+size-1) y
-        stroke
+                setSourceRGB 0 0 0
+                moveTo (x+size-1) y
+                lineTo x y
+                lineTo x (y+size-1)
+                stroke
+
+                setSourceRGB 0.5 0.5 0.5
+                moveTo x (y+size-1)
+                lineTo (x+size-1) (y+size-1)
+                lineTo (x+size-1) y
+                stroke
+        showCell :: Int -> Cell -> String
+        showCell b m = case (b, m) of
+                        (_, Masked) -> "-"
+                        (_, Question) -> "?"
+                        (_, BaseTypes.Cross) -> "X"
+                        (0, Unmasked) -> " "
+                        (-1, Unmasked) -> "B"
+                        (x, Unmasked) -> show x

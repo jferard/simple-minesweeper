@@ -6,10 +6,10 @@ import BaseTypes
 -- draw the board game : a board is the superposition of two grids. If the cell is unmasked, then show the bomb grid, else show the current mask
 showBoard::[[Int]] -> [[Cell]] -> [[String]]
 showBoard bombGrid maskGrid = map drawRowOfBoard (zip bombGrid maskGrid)
-    where drawRowOfBoard (bombRow, maskRow) = map drawCell (zip bombRow maskRow)
+    where drawRowOfBoard (bombRow, maskRow) = map showCell (zip bombRow maskRow)
                                                 where
-                                                    drawCell :: (Int, Cell) -> String
-                                                    drawCell (b, m) = case (b, m) of
+                                                    showCell :: (Int, Cell) -> String
+                                                    showCell (b, m) = case (b, m) of
                                                                     (_, Masked) -> "-"
                                                                     (_, Question) -> "?"
                                                                     (_, Cross) -> "X"
