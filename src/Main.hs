@@ -20,5 +20,6 @@ main = do
     let gen' = 0 -- temp
     let count = 0 -- temp
 -}
-    let bombsCoordinates = createBombsCoordinates gen' count 
-    game (createBombGrid 10 10 bombsCoordinates) (createMaskGrid 10 10)
+    let bombsCoordinates = createBombsCoordinates gen' count
+    putStrLn "ok"
+    --game (createBombGrid 10 10 bombsCoordinates) (createMaskGrid 10 10)
