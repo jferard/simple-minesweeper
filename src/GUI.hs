@@ -44,7 +44,16 @@ printHello = do
     _ <- widgetGetDrawWindow canvas
     on canvas exposeEvent $ renderBoard
 
+    on canvas buttonPressEvent $ printXY
+
     mainGUI
+
+printXY :: EventM EButton Bool
+printXY = do
+    (x, y)      <- eventCoordinates
+    liftIO $ do putStrLn $ show (x, y)
+
+    return True
 
 renderBoard :: EventM EExpose Bool
 renderBoard = do
