@@ -44,14 +44,15 @@ printHello = do
     _ <- widgetGetDrawWindow canvas
     on canvas exposeEvent $ renderBoard
 
-    on canvas buttonPressEvent $ printXY
+    on canvas buttonPressEvent $ printXYButton
 
     mainGUI
 
-printXY :: EventM EButton Bool
-printXY = do
+printXYButton :: EventM EButton Bool
+printXYButton = do
     (x, y)      <- eventCoordinates
-    liftIO $ do putStrLn $ show (x, y)
+    b <- eventButton
+    liftIO $ do putStrLn $ show (x, y, b)
 
     return True
 
@@ -60,24 +61,24 @@ renderBoard = do
     dw      <- eventWindow
     region  <- eventRegion >>= liftIO . regionGetRectangles
     liftIO . renderWithDrawable dw $ do
-        renderCell 0 0 1 Masked
-        renderCell 0 1 1 Question
-        renderCell 0 2 1 BaseTypes.Cross
-        renderCell 0 3 0 Unmasked
-        renderCell 0 4 (-1) Unmasked
-        renderCell 0 5 5 Unmasked
+        renderCell dw 0 0 1 Masked
+        renderCell dw 0 1 1 Question
+        renderCell dw 0 2 1 BaseTypes.Cross
+        renderCell dw 0 3 0 Unmasked
+        renderCell dw 0 4 (-1) Unmasked
+        renderCell dw 0 5 5 Unmasked
     return True
 
 
-renderCell :: Double -> Double -> Int -> Cell -> Render ()
+renderCell :: DrawWindow -> Double -> Double -> Int -> Cell -> Render ()
 renderCell = renderCellOfSize 20
 
-renderCellOfSize :: Double -> Double -> Double -> Int -> Cell -> Render ()
-renderCellOfSize size r c bomb mask = do
+renderCellOfSize :: Double -> DrawWindow -> Double -> Double -> Int -> Cell -> Render ()
+renderCellOfSize size dw r c bomb mask = do
+    renderTile size r c
     setSourceRGB 0 0 0
     moveTo (c*size+size*0.30) (r*size+size*0.75)
     showText $ showCell bomb mask
-    renderTile size r c
 
     where
         renderTile :: Double -> Double -> Double -> Render()
@@ -85,6 +86,7 @@ renderCellOfSize size r c bomb mask = do
             let x = c*size
                 y = r*size
             in do
+                liftIO $ do drawWindowClearArea dw (floor x) (floor y) (ceiling $ x+size-1) (ceiling $ y+size-1)
                 setLineWidth 2
 
                 setSourceRGB 0 0 0
