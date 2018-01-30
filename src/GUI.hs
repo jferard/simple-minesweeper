@@ -50,9 +50,12 @@ printHello = do
 
 printXYButton :: EventM EButton Bool
 printXYButton = do
+    dw      <- eventWindow
     (x, y)      <- eventCoordinates
     b <- eventButton
-    liftIO $ do putStrLn $ show (x, y, b)
+    liftIO . renderWithDrawable dw $ do
+        renderCell dw 0 0 1 Unmasked
+    -- liftIO $ do putStrLn $ show (x, y, b)
 
     return True
 
