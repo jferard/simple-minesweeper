@@ -8,6 +8,8 @@ import System.Random
 import Logic
 import TUI
 import GUI
+import Game
+import UI
 
 -- let's start.
 main :: IO ()    
@@ -22,4 +24,4 @@ main = do
 -}
     let bombsCoordinates = createBombsCoordinates gen' count
     putStrLn "ok"
-    game (createBombGrid 10 10 bombsCoordinates) (createMaskGrid 10 10)
+    game TUI (createBombGrid 10 10 bombsCoordinates) (createMaskGrid 10 10)
