@@ -5,3 +5,5 @@ data Cell = Masked | Question | Cross | Unmasked
     deriving (Eq)
 
 data State = Win | Loss | Playing
+
+data Board = Board [[Int]] [[Cell]]

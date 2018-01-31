@@ -24,4 +24,4 @@ main = do
 -}
     let bombsCoordinates = createBombsCoordinates gen' count
     putStrLn "ok"
-    game TUI (createBombGrid 10 10 bombsCoordinates) (createMaskGrid 10 10)
+    game TUI $ createBoard 10 10 bombsCoordinates

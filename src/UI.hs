@@ -12,15 +12,15 @@ class Monad m => UI a m where
     getCommandLine :: a -> m String
 
     -- render the initial board
-    renderInitialBoard :: a -> [[Int]] -> [[Cell]] -> m ()
+    renderInitialBoard :: a -> Board -> m ()
 
     -- render a win
-    renderWin :: a -> [[Int]] -> [[Cell]] -> m ()
+    renderWin :: a -> Board -> m ()
 
     -- render a loss
-    renderLoss :: a -> [[Int]] -> [[Cell]] -> m ()
+    renderLoss :: a -> Board -> m ()
 
     -- render the board after the cell r, c changed
     -- may re-render the whole board or only the impacted cells
-    renderBoard :: a -> [[Int]] -> [[Cell]] -> Int -> Int -> m ()
-    renderBoard ui bombGrid maskGrid r c = renderInitialBoard ui bombGrid maskGrid
+    renderBoard :: a -> Board -> Int -> Int -> m ()
+    renderBoard ui board _ _ = renderInitialBoard ui board

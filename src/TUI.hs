@@ -17,20 +17,14 @@ instance UI TUI IO where
 
     getCommandLine tui = (map toLower) <$> getLine
 
-    renderInitialBoard tui bombGrid maskGrid = do
+    renderInitialBoard tui board = do
         clearScreen
-        printBoard bombGrid maskGrid
-        where
-            -- print the board, with a..j and 0..9
-            printBoard::[[Int]] -> [[Cell]] -> IO ()
-            printBoard bombGrid maskGrid = do
-                putStrLn $ ' ':['A'..'J']
-                mapM_ (\ (i, row) -> putStrLn $ show i++(concat row)) (zip [0..] (showBoard bombGrid maskGrid))
+        putStrLn $ show board
 
-    renderWin tui bombGrid maskGrid = do
+    renderWin tui board = do
         putStrLn "Board Complete"
 
-    renderLoss tui bombGrid maskGrid = do
+    renderLoss tui board = do
         putStrLn "BOOM!!!"
 
 -- clear the screen (Hack for Un*x, Windows)

@@ -4,9 +4,10 @@ import System.Random
 import BaseTypes
 
 -- draw the board game : a board is the superposition of two grids. If the cell is unmasked, then show the bomb grid, else show the current mask
-showBoard::[[Int]] -> [[Cell]] -> [[String]]
-showBoard bombGrid maskGrid = map drawRowOfBoard (zip bombGrid maskGrid)
-    where drawRowOfBoard (bombRow, maskRow) = map showCell (zip bombRow maskRow)
+instance Show Board where
+    show (Board bombGrid maskGrid) =
+        init $ ' ':['A'..'J'] ++ "\n" ++ concatMap showRowOfBoard (zip3 [0..] bombGrid maskGrid)
+        where showRowOfBoard (i, bombRow, maskRow) = (show i ++ concatMap showCell (zip bombRow maskRow)) ++ "\n"
                                                 where
                                                     showCell :: (Int, Cell) -> String
                                                     showCell (b, m) = case (b, m) of
@@ -17,9 +18,46 @@ showBoard bombGrid maskGrid = map drawRowOfBoard (zip bombGrid maskGrid)
                                                                     (-1, Unmasked) -> "B"
                                                                     (x, Unmasked) -> show x
 
+cellIsMasked :: Board -> (Int, Int) -> Bool
+cellIsMasked (Board _ maskGrid) (r, c) = (maskGrid !! r) !! c == Masked
+
+-- unmask a cell, and the adjacent cells if there is no bomb around.
+unmaskCell :: Board -> (Int, Int) -> Board
+unmaskCell board@(Board bombGrid  maskGrid) (r, c) =
+    let newBoard@(Board _ newMaskGrid) = setCell board (r, c) Unmasked in
+    case (bombGrid !! r) !! c of
+        -- if it's a "0" cell, then unmask all masked neighbors
+        0 -> foldl unmaskCell newBoard maskedNeighbors
+            where
+                maskedNeighbors :: [(Int, Int)]
+                maskedNeighbors = filter (\ (nr,nc) -> 0 <= nr && nr < 10 && 0<= nc && nc < 10 && (newMaskGrid !! nr) !! nc /= Unmasked) allNeighbors
+                allNeighbors = [(r+dr, c+dc) | dr<-[-1,0,1], dc<-[-1,0,1]]
+        _ -> newBoard
+
+
+createBoard :: Int -> Int -> [(Int, Int)] -> Board
+createBoard h w bombsCoordinates = Board (createBombGrid h w bombsCoordinates) (createMaskGrid h w)
+    where
+        -- given a height and a width, create a bomb grid : -1 is a bomb, n >=0 is the number of bombs in the neighborhood
+        createBombGrid :: Int -> Int -> [(Int, Int)] -> [[Int]]
+        createBombGrid h w bombsCoordinates = [createBombRow r w bombsCoordinates | r <- [0..h-1]]
+        createBombRow r w bombsCoordinates = map f [0..(w-1)]
+            where f c =
+                    if (r,c) `elem` bombsCoordinates
+                    then -1
+                    else
+                        foldl g 0 bombsCoordinates
+                            where g acc (rBomb, cBomb) = if r-rBomb `elem` [-1,0,1] && c-cBomb `elem` [-1,0,1] then acc+1 else acc
+
+
+        -- given a height and a width, create a mask grid
+        createMaskGrid :: Int -> Int -> [[Cell]]
+        createMaskGrid h w = [[Masked | c <- [0..(w-1)]]| r <- [0..h-1]]
+
+
 -- algorithm : start with a win. If a bomb is unmasked, result is a loss. If a non bomb is masked, the result is playing
-gameState :: [[Int]] -> [[Cell]] -> State
-gameState bombGrid maskGrid = foldl gameOverRow Win (zip bombGrid maskGrid)
+gameState :: Board -> State
+gameState (Board bombGrid maskGrid) = foldl gameOverRow Win (zip bombGrid maskGrid)
     where
         gameOverRow :: State -> ([Int], [Cell]) -> State
         gameOverRow Loss _ = Loss
@@ -32,23 +70,17 @@ gameState bombGrid maskGrid = foldl gameOverRow Win (zip bombGrid maskGrid)
             (b, m) | b >= 0 && m /= Unmasked -> Playing
             _ -> state
 
--- unmask a cell, and the adjacent cells if there is no bomb around.
-unmask :: [[Int]] -> [[Cell]] -> (Int, Int) -> [[Cell]]
-unmask bombGrid  maskGrid (r, c) = let grid = set maskGrid (r, c) Unmasked in case (bombGrid !! r) !! c of
-    0 -> foldl (unmask bombGrid) grid (neighbors grid)
-        where
-            allNeighbors = [(r+dr, c+dc) | dr<-[-1,0,1], dc<-[-1,0,1]]
-            neighbors grid = filter (\ (nr,nc) -> 0 <= nr && nr < 10 && 0<= nc && nc < 10 && (grid !! nr) !! nc /= Unmasked) allNeighbors
-    _ -> grid
-
 -- set a value in a grid
-set :: [[a]] -> (Int, Int) -> a -> [[a]]
-set grid (r, c) value = befRows ++ [setInRow row c value] ++ aftRows
+setCell :: Board -> (Int, Int) -> Cell -> Board
+setCell (Board bombGrid maskGrid) (r, c) value = Board bombGrid (set' maskGrid (r, c) value)
     where
-        (befRows, row:aftRows) = splitAt r grid
-        setInRow row c value = befCells ++ [value] ++ aftCells
+        set' :: [[a]] -> (Int, Int) -> a -> [[a]]
+        set' grid (r, c) value = befRows ++ [setInRow row c value] ++ aftRows
             where
-                (befCells, _:aftCells) = splitAt c row
+                (befRows, row:aftRows) = splitAt r grid
+                setInRow row c value = befCells ++ [value] ++ aftCells
+                    where
+                        (befCells, _:aftCells) = splitAt c row
 
 -- given a StdGen and a count, return n coordinates. May loop forever.
 createBombsCoordinates :: StdGen -> Int -> [(Int, Int)]
@@ -68,18 +100,3 @@ createBombsCoordinates gen' count = createBombsCoordinates' gen' count []
             (c, g'') = randomR (0,9) g'
 
 
--- given a height and a width, create a bomb grid : -1 is a bomb, n >=0 is the number of bombs in the neighborhood
-createBombGrid :: Int -> Int -> [(Int, Int)] -> [[Int]]
-createBombGrid h w bombsCoordinates = [createBombRow r w bombsCoordinates | r <- [0..h-1]]
-createBombRow r w bombsCoordinates = map f [0..(w-1)]
-    where f c =
-            if (r,c) `elem` bombsCoordinates
-            then -1
-            else
-                foldl g 0 bombsCoordinates
-                    where g acc (rBomb, cBomb) = if r-rBomb `elem` [-1,0,1] && c-cBomb `elem` [-1,0,1] then acc+1 else acc
-
-
--- given a height and a width, create a mask grid
-createMaskGrid :: Int -> Int -> [[Cell]]
-createMaskGrid h w = [[Masked | c <- [0..(w-1)]]| r <- [0..h-1]]
