@@ -3,9 +3,14 @@ module GUI where
 import BaseTypes
 import Graphics.UI.Gtk as Gtk
 import Graphics.Rendering.Cairo
+import Logic
+import Control.Monad
+import Control.Monad.Fix
 
-printHello :: IO ()
-printHello = do
+data GUI = GUI
+
+initGame :: GUI -> Double -> Board -> IO()
+initGame gui 25 board = do
     initGUI
     -- window
     window <- windowNew
@@ -42,52 +47,63 @@ printHello = do
     widgetShowAll window
 
     _ <- widgetGetDrawWindow canvas
-    on canvas exposeEvent $ renderBoard
 
-    on canvas buttonPressEvent $ printXYButton
+    defineCallbacks $ Context canvas 30 board
+    start
 
-    mainGUI
 
-printXYButton :: EventM EButton Bool
-printXYButton = do
+defineCallbacks :: Context -> IO()
+defineCallbacks context@(Context canvas _ _) = do
+    mfix $ \cid -> on canvas buttonPressEvent $ buttonPressCB context cid
+    on canvas exposeEvent $ renderBoardCB context
+    return ()
+
+start :: IO()
+start = mainGUI
+
+buttonPressCB :: Context -> ConnectId DrawingArea -> EventM EButton Bool
+buttonPressCB context@(Context canvas size board) cid = do
     dw      <- eventWindow
     (x, y)      <- eventCoordinates
-    b <- eventButton
-    liftIO . renderWithDrawable dw $ do
-        renderCell dw 0 0 1 Unmasked
-    -- liftIO $ do putStrLn $ show (x, y, b)
+    button <- eventButton
+    let (c, r) = (floor $ x / size, floor $ y / size)
+    let newBoard@(Board bombGrid maskGrid) = case button of
+                        LeftButton -> (if cellIsMasked board (r, c) then unmaskCell board (r, c) else setCell board (r, c) Masked)
+                        RightButton -> (setCell board (r, c) BaseTypes.Cross)
+
+    liftIO . signalDisconnect $ cid
+    liftIO . defineCallbacks $ Context canvas size newBoard
+    liftIO . renderWithDrawable dw $
+        mapM_ (renderRowOfBoard size dw) (zip3 [0..] bombGrid maskGrid)
 
     return True
 
-renderBoard :: EventM EExpose Bool
-renderBoard = do
+renderBoardCB :: Context -> EventM EExpose Bool
+renderBoardCB (Context _ size (Board bombGrid maskGrid)) = do
     dw      <- eventWindow
     region  <- eventRegion >>= liftIO . regionGetRectangles
-    liftIO . renderWithDrawable dw $ do
-        renderCell dw 0 0 1 Masked
-        renderCell dw 0 1 1 Question
-        renderCell dw 0 2 1 BaseTypes.Cross
-        renderCell dw 0 3 0 Unmasked
-        renderCell dw 0 4 (-1) Unmasked
-        renderCell dw 0 5 5 Unmasked
+    liftIO . renderWithDrawable dw $
+        mapM_ (renderRowOfBoard size dw) (zip3 [0..] bombGrid maskGrid)
+
     return True
 
+renderRowOfBoard :: Double -> DrawWindow -> (Int, [Int], [Cell]) -> Render ()
+renderRowOfBoard size dw (r, bombRow, maskRow) = mapM_ (renderCell size dw r) (zip3 [0..] bombRow maskRow)
 
-renderCell :: DrawWindow -> Double -> Double -> Int -> Cell -> Render ()
-renderCell = renderCellOfSize 20
-
-renderCellOfSize :: Double -> DrawWindow -> Double -> Double -> Int -> Cell -> Render ()
-renderCellOfSize size dw r c bomb mask = do
+renderCell :: Double -> DrawWindow -> Int -> (Int, Int, Cell) -> Render ()
+renderCell size dw r (c, bomb, mask) = do
     renderTile size r c
     setSourceRGB 0 0 0
-    moveTo (c*size+size*0.30) (r*size+size*0.75)
+    let x = (fromIntegral c)*size+size*0.30 :: Double
+    let y = (fromIntegral r)*size+size*0.75 :: Double
+    moveTo x y
     showText $ showCell bomb mask
 
     where
-        renderTile :: Double -> Double -> Double -> Render()
+        renderTile :: Double -> Int -> Int -> Render()
         renderTile size r c =
-            let x = c*size
-                y = r*size
+            let x = (fromIntegral c)*size
+                y = (fromIntegral r)*size
             in do
                 liftIO $ do drawWindowClearArea dw (floor x) (floor y) (ceiling $ x+size-1) (ceiling $ y+size-1)
                 setLineWidth 2

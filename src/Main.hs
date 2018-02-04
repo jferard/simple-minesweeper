@@ -8,14 +8,11 @@ import System.Random
 import Logic
 import TUI
 import GUI
-import Game
 import UI
 
 -- let's start.
 main :: IO ()    
 main = do
-    printHello
-
     gen <- getStdGen
     let (count, gen') = randomR (10,30) gen
 {-
@@ -23,5 +20,9 @@ main = do
     let count = 0 -- temp
 -}
     let bombsCoordinates = createBombsCoordinates gen' count
+    let board = createBoard 10 10 bombsCoordinates
     putStrLn "ok"
-    game TUI $ createBoard 10 10 bombsCoordinates
+    GUI.initGame GUI 25 board
+
+
+--    game TUI $ createBoard 10 10 bombsCoordinates

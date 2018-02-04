@@ -27,6 +27,8 @@ instance UI TUI IO where
     renderLoss tui board = do
         putStrLn "BOOM!!!"
 
+    initGame tui = return()
+
 -- clear the screen (Hack for Un*x, Windows)
 clearScreen :: IO ()
 clearScreen = do
