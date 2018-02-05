@@ -97,6 +97,9 @@ renderCell size dw r (c, bomb, mask) = do
     let x = (fromIntegral c)*size+size*0.30 :: Double
     let y = (fromIntegral r)*size+size*0.75 :: Double
     moveTo x y
+    case (bomb, mask) of
+        (b, Unmasked) | b >= 0 -> setSourceRGB (0.2*(fromIntegral b)) (1-0.2*(fromIntegral b)) 0
+        _  -> setSourceRGB  0 0 0
     showText $ showCell bomb mask
 
     where
