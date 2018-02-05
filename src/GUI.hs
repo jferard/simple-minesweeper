@@ -92,7 +92,7 @@ renderRowOfBoard size dw (r, bombRow, maskRow) = mapM_ (renderCell size dw r) (z
 
 renderCell :: Double -> DrawWindow -> Int -> (Int, Int, Cell) -> Render ()
 renderCell size dw r (c, bomb, mask) = do
-    renderTile size r c
+    renderTile size r c mask
     setSourceRGB 0 0 0
     let x = (fromIntegral c)*size+size*0.30 :: Double
     let y = (fromIntegral r)*size+size*0.75 :: Double
@@ -100,12 +100,19 @@ renderCell size dw r (c, bomb, mask) = do
     showText $ showCell bomb mask
 
     where
-        renderTile :: Double -> Int -> Int -> Render()
-        renderTile size r c =
+        renderTile :: Double -> Int -> Int -> Cell -> Render()
+        renderTile size r c mask =
             let x = (fromIntegral c)*size
                 y = (fromIntegral r)*size
             in do
                 liftIO $ do drawWindowClearArea dw (floor x) (floor y) (ceiling $ x+size-1) (ceiling $ y+size-1)
+                case mask of
+                    Unmasked -> return()
+                    _ -> do
+                                setSourceRGB 0.7 0.7 0.7
+                                Graphics.Rendering.Cairo.rectangle x y (x+size) (y+size)
+                                Graphics.Rendering.Cairo.fill
+
                 setLineWidth 2
 
                 setSourceRGB 0 0 0
@@ -119,9 +126,10 @@ renderCell size dw r (c, bomb, mask) = do
                 lineTo (x+size-1) (y+size-1)
                 lineTo (x+size-1) y
                 stroke
+
         showCell :: Int -> Cell -> String
         showCell b m = case (b, m) of
-                        (_, Masked) -> "-"
+                        (_, Masked) -> ""
                         (_, Question) -> "?"
                         (_, BaseTypes.Cross) -> "X"
                         (0, Unmasked) -> " "
