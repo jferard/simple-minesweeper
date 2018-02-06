@@ -16,7 +16,7 @@ instance Show Board where
         init $ ' ':['A'..'J'] ++ "\n" ++ concatMap showRowOfBoard (zip3 [0..] bombGrid maskGrid)
         where showRowOfBoard (i, bombRow, maskRow) = (show i ++ concatMap showCell (zip bombRow maskRow)) ++ "\n"
                                                 where
-                                                    showCell :: (Int, Cell) -> String
+                                                    showCell :: (Int, Tile) -> String
                                                     showCell (b, m) = case (b, m) of
                                                                     (_, Masked) -> "-"
                                                                     (_, Question) -> "?"
@@ -58,7 +58,7 @@ createBoard h w bombsCoordinates = Board (createBombGrid h w bombsCoordinates) (
 
 
         -- given a height and a width, create a mask grid
-        createMaskGrid :: Int -> Int -> [[Cell]]
+        createMaskGrid :: Int -> Int -> [[Tile]]
         createMaskGrid h w = [[Masked | c <- [0..(w-1)]]| r <- [0..h-1]]
 
 
@@ -66,11 +66,11 @@ createBoard h w bombsCoordinates = Board (createBombGrid h w bombsCoordinates) (
 gameState :: Board -> State
 gameState (Board bombGrid maskGrid) = foldl gameOverRow Win (zip bombGrid maskGrid)
     where
-        gameOverRow :: State -> ([Int], [Cell]) -> State
+        gameOverRow :: State -> ([Int], [Tile]) -> State
         gameOverRow Loss _ = Loss
         gameOverRow state (bombRow, maskRow) = foldl updateGameOver state (zip bombRow maskRow)
 
-        updateGameOver :: State -> (Int, Cell) -> State
+        updateGameOver :: State -> (Int, Tile) -> State
         updateGameOver Loss _ = Loss
         updateGameOver state bm = case bm of
             (-1, Unmasked) -> Loss
@@ -78,7 +78,7 @@ gameState (Board bombGrid maskGrid) = foldl gameOverRow Win (zip bombGrid maskGr
             _ -> state
 
 -- set a value in a grid
-setCell :: Board -> (Int, Int) -> Cell -> Board
+setCell :: Board -> (Int, Int) -> Tile -> Board
 setCell (Board bombGrid maskGrid) (r, c) value = Board bombGrid (set' maskGrid (r, c) value)
     where
         set' :: [[a]] -> (Int, Int) -> a -> [[a]]

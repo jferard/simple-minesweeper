@@ -118,10 +118,10 @@ renderBoardCB (Context _ size (Board bombGrid maskGrid)) previousCids = do
 
     return True
 
-renderRowOfBoard :: Double -> DrawWindow -> (Int, [Int], [Cell]) -> Render ()
+renderRowOfBoard :: Double -> DrawWindow -> (Int, [Int], [Tile]) -> Render ()
 renderRowOfBoard size dw (r, bombRow, maskRow) = mapM_ (renderCell size dw r) (zip3 [0..] bombRow maskRow)
 
-renderCell :: Double -> DrawWindow -> Int -> (Int, Int, Cell) -> Render ()
+renderCell :: Double -> DrawWindow -> Int -> (Int, Int, Tile) -> Render ()
 renderCell size dw r (c, bomb, mask) = do
     renderTile size r c mask
     setSourceRGB 0 0 0
@@ -134,7 +134,7 @@ renderCell size dw r (c, bomb, mask) = do
     showText $ showCell bomb mask
 
     where
-        renderTile :: Double -> Int -> Int -> Cell -> Render()
+        renderTile :: Double -> Int -> Int -> Tile -> Render()
         renderTile size r c mask =
             let x = (fromIntegral c)*size
                 y = (fromIntegral r)*size
@@ -161,7 +161,7 @@ renderCell size dw r (c, bomb, mask) = do
                 lineTo (x+size-1) y
                 stroke
 
-        showCell :: Int -> Cell -> String
+        showCell :: Int -> Tile -> String
         showCell b m = case (b, m) of
                         (_, Masked) -> ""
                         (_, Question) -> "?"
