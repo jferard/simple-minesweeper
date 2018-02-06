@@ -3,6 +3,13 @@ module Logic where
 import System.Random
 import BaseTypes
 
+initBoard :: Int ->  Int -> Int -> IO Board
+initBoard bombCount rows columns = do
+    gen <- newStdGen
+    let bombsCoordinates = createBombsCoordinates gen bombCount
+    let board = createBoard rows columns bombsCoordinates
+    return board
+
 -- draw the board game : a board is the superposition of two grids. If the cell is unmasked, then show the bomb grid, else show the current mask
 instance Show Board where
     show (Board bombGrid maskGrid) =

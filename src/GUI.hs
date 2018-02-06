@@ -5,6 +5,7 @@ import Graphics.UI.Gtk as Gtk
 import Graphics.Rendering.Cairo
 import Logic
 import Control.Monad
+import Control.Monad.Trans
 import Control.Monad.Fix
 
 data GUI = GUI
@@ -27,17 +28,25 @@ initGame gui 25 board = do
     msg <- labelNew (Just "A GTK version is under development.")
     containerAdd mainbox msg
 
-    -- button
-    button <- buttonNew
-    set button [ buttonLabel := "Ok" ]
-    onClicked button $ do
+    -- button quit
+    buttonQ <- buttonNew
+    set buttonQ [ buttonLabel := "Quit" ]
+    onClicked buttonQ $ do
         widgetDestroy window
-    containerAdd mainbox button
+
+    containerAdd mainbox buttonQ
+
+    canvas <- drawingAreaNew
+
+    -- button start
+    buttonS <- buttonNew
+    set buttonS [ buttonLabel := "Start" ]
+
+    containerAdd mainbox buttonS
 
     -- frame
     frame <- frameNew
     containerAdd mainbox frame
-    canvas <- drawingAreaNew
     widgetModifyBg canvas StateNormal (Color 65535 65535 65535)
     containerAdd frame canvas
     widgetSetSizeRequest frame 350 350
@@ -46,40 +55,62 @@ initGame gui 25 board = do
     containerAdd window mainbox
     widgetShowAll window
 
+    startGame canvas board buttonS
     _ <- widgetGetDrawWindow canvas
+    mainGUI
 
-    defineCallbacks $ Context canvas 30 board
-    start
+startGame :: DrawingArea -> Board -> Button -> IO (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea)
+startGame canvas board buttonS = do
+    mfix $ \cids -> defineCallbacks (Context canvas 30 board) buttonS cids
 
+defineCallbacks :: Context -> Button -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> IO (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea)
+defineCallbacks context@(Context canvas _ _) buttonS previousCids = do
+    liftIO $ putStrLn "redefine callbacks: should disconnect previous event handlers"
+    sCid <- onClicked buttonS $ do
+        board@(Board bombGrid maskGrid) <- initBoard 10 10 10
+        startGame canvas board buttonS
+        return ()
 
-defineCallbacks :: Context -> IO()
-defineCallbacks context@(Context canvas _ _) = do
-    mfix $ \cid -> on canvas buttonPressEvent $ buttonPressCB context cid
-    on canvas exposeEvent $ renderBoardCB context
-    return ()
+    bCid <- on canvas buttonPressEvent $ buttonPressCB context buttonS previousCids
+    eCid <- on canvas exposeEvent $ renderBoardCB context previousCids
+    return (sCid, bCid, eCid)
 
-start :: IO()
-start = mainGUI
+disconnectPrevious :: (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> IO()
+disconnectPrevious (sCid, bCid, eCid) = do
+    signalDisconnect sCid
+    signalDisconnect bCid
+    signalDisconnect eCid
 
-buttonPressCB :: Context -> ConnectId DrawingArea -> EventM EButton Bool
-buttonPressCB context@(Context canvas size board) cid = do
+buttonPressCB :: Context -> Button -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EButton Bool
+buttonPressCB context@(Context canvas size board) buttonS previousCids = do
     dw      <- eventWindow
     (x, y)      <- eventCoordinates
     button <- eventButton
     let (c, r) = (floor $ x / size, floor $ y / size)
     let newBoard@(Board bombGrid maskGrid) = case button of
-                        LeftButton -> (if cellIsMasked board (r, c) then unmaskCell board (r, c) else setCell board (r, c) Masked)
+                        LeftButton -> (if cellIsMasked board (r, c) then unmaskCell board (r, c) else board)
                         RightButton -> (setCell board (r, c) BaseTypes.Cross)
 
-    liftIO . signalDisconnect $ cid
-    liftIO . defineCallbacks $ Context canvas size newBoard
     liftIO . renderWithDrawable dw $
         mapM_ (renderRowOfBoard size dw) (zip3 [0..] bombGrid maskGrid)
+    liftIO $ case gameState newBoard of
+        Win -> renderWithDrawable dw $ renderWin $ board
+        Loss -> renderWithDrawable dw $ renderLoss $ board
+        Playing -> do
+            disconnectPrevious previousCids
+            mfix $ \cids -> defineCallbacks (Context canvas size newBoard) buttonS cids
+            return ()
 
     return True
 
-renderBoardCB :: Context -> EventM EExpose Bool
-renderBoardCB (Context _ size (Board bombGrid maskGrid)) = do
+renderWin :: Board -> Render()
+renderWin board = liftIO $ putStrLn "Win!"
+
+renderLoss :: Board -> Render()
+renderLoss board = liftIO $ putStrLn "Loss!"
+
+renderBoardCB :: Context -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EExpose Bool
+renderBoardCB (Context _ size (Board bombGrid maskGrid)) previousCids = do
     dw      <- eventWindow
     region  <- eventRegion >>= liftIO . regionGetRectangles
     liftIO . renderWithDrawable dw $

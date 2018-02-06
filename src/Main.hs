@@ -13,16 +13,5 @@ import UI
 -- let's start.
 main :: IO ()    
 main = do
-    gen <- getStdGen
-    let (count, gen') = randomR (10,30) gen
-{-
-    let gen' = 0 -- temp
-    let count = 0 -- temp
--}
-    let bombsCoordinates = createBombsCoordinates gen' count
-    let board = createBoard 10 10 bombsCoordinates
-    putStrLn "ok"
+    board <- initBoard 10 10 10
     GUI.initGame GUI 25 board
-
-
---    game TUI $ createBoard 10 10 bombsCoordinates
