@@ -11,7 +11,7 @@ import Control.Monad.Fix
 data GUI = GUI
 
 initGame :: GUI -> Double -> Board -> IO()
-initGame gui 25 board = do
+initGame gui _ board = do
     initGUI
     -- window
     window <- windowNew

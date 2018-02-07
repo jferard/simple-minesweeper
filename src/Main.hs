@@ -5,6 +5,7 @@
 -- LICENSE : GPL v3
 
 import System.Random
+import System.Environment
 import Logic
 import TUI
 import GUI
@@ -14,5 +15,9 @@ import UI
 main :: IO ()    
 main = do
     board <- initBoard 10 10 10
-    GUI.initGame GUI 25 board
-    --UI.game TUI board
+    args <- getArgs
+    let ui = case args of
+                ["tui"] -> "tui"
+                _ -> "gui"
+
+    if ui == "tui" then UI.game TUI board else GUI.initGame GUI 10 board
