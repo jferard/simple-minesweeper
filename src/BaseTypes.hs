@@ -12,7 +12,7 @@ data Cell = Cell { bomb :: Int, tile :: Tile }
 
 data Board = Board [[Cell]]
 
-data Context = Context DrawingArea Double Board
+data Context = Context { canvas :: DrawingArea, size :: Double, board :: Board, buttonS :: Button }
 
 -- draw the board game : a board is the superposition of two grids. If the cell is unmasked, then show the bomb grid, else show the current mask
 instance Show Board where

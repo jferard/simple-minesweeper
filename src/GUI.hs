@@ -18,7 +18,6 @@ initGame gui 25 board = do
     onDestroy window mainQuit
     set window [
        containerBorderWidth := 10,
-       windowDefaultWidth := 350,
        windowTitle := "Simple Minesweeper (J. Férard)" ]
 
     -- mainbox
@@ -49,79 +48,87 @@ initGame gui 25 board = do
     containerAdd mainbox frame
     widgetModifyBg canvas StateNormal (Color 65535 65535 65535)
     containerAdd frame canvas
-    widgetSetSizeRequest frame 350 350
+    widgetSetSizeRequest frame (300+2*2) (300+2*2)
 
     -- end mainbox
     containerAdd window mainbox
     widgetShowAll window
 
-    startGame canvas board buttonS
+    startGame Context { canvas = canvas, size = 30, board = board, buttonS = buttonS }
     _ <- widgetGetDrawWindow canvas
     mainGUI
 
-startGame :: DrawingArea -> Board -> Button -> IO (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea)
-startGame canvas board buttonS = do
-    mfix $ \cids -> defineCallbacks (Context canvas 30 board) buttonS cids
+startGame :: Context -> IO (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea)
+startGame context = do
+    mfix $ \cids -> defineCallbacks context cids
 
--- Callbacks. We keep a reference on connect ids to disconnect before every new call.
-defineCallbacks :: Context -> Button -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> IO (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea)
-defineCallbacks context@(Context canvas _ _) buttonS previousCids = do
+-- Callbacks. We keep a reference on connect ids to disconnect signals before every new call.
+defineCallbacks :: Context -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> IO (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea)
+defineCallbacks context previousCids = do
     liftIO $ putStrLn "redefine callbacks: should disconnect event handlers before a new call"
-    sCid <- on buttonS buttonPressEvent $ startCB context buttonS previousCids
-    bCid <- on canvas buttonPressEvent $ buttonPressCB context buttonS previousCids
-    eCid <- on canvas exposeEvent $ renderBoardCB context previousCids
+    sCid <- (buttonS context) `on` buttonPressEvent $ startCB context previousCids
+    bCid <- (canvas context) `on` buttonPressEvent $ buttonPressCB context previousCids
+    eCid <- (canvas context) `on` exposeEvent $ renderBoardCB context previousCids
     return (sCid, bCid, eCid)
 
-startCB :: Context -> Button -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EButton Bool
-startCB context@(Context canvas size _) buttonS previousCids = do
-        liftIO $ do
-            dw <- drawingAreaGetDrawWindow canvas
-            disconnectPrevious previousCids
-            board <- initBoard 10 10 10
-            renderWithDrawable dw $ renderBoard size dw board
-            startGame canvas board buttonS
-        return True
+startCB :: Context -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EButton Bool
+startCB context previousCids = do
+    liftIO $ do
+        dw <- widgetGetDrawWindow $ canvas context
+        disconnectPrevious previousCids
+        newBoard <- initBoard 10 10 10
+        let newContext = context { board = newBoard }
+        renderWithDrawable dw $ renderBoard newContext dw
+        startGame newContext
+    return True
 
 
 disconnectPrevious :: (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> IO()
 disconnectPrevious (sCid, bCid, eCid) = do
-    liftIO $ putStrLn "disconnect event handlers"
+    putStrLn "disconnect event handlers"
     signalDisconnect sCid
     signalDisconnect bCid
     signalDisconnect eCid
 
-buttonPressCB :: Context -> Button -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EButton Bool
-buttonPressCB context@(Context canvas size board) buttonS previousCids = do
+buttonPressCB :: Context -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EButton Bool
+buttonPressCB context previousCids = do
     dw      <- eventWindow
     (x, y)      <- eventCoordinates
     button <- eventButton
-    let (c, r) = (floor $ x / size, floor $ y / size)
+    let s = size context
+    let (c, r) = (floor $ x / s, floor $ y / s)
+    let previousBoard = board context
     let newBoard = case button of
-                        LeftButton -> (if cellIsMasked board (r, c) then unmaskCell board (r, c) else board)
-                        RightButton -> (setTile board (r, c) BaseTypes.Cross)
+                        LeftButton -> (if cellIsMasked previousBoard (r, c) then unmaskCell previousBoard (r, c) else previousBoard)
+                        RightButton -> (setTile previousBoard (r, c) BaseTypes.Cross)
+    let newContext = context { board = newBoard}
 
     liftIO $ do
-        renderWithDrawable dw $ renderBoard size dw newBoard
+        renderWithDrawable dw $ renderBoard newContext dw
         case gameState newBoard of
-            Win -> renderWithDrawable dw $ renderWin $ board
-            Loss -> renderWithDrawable dw $ renderLoss $ board
+            Win -> renderWithDrawable dw $ renderWin newContext dw
+            Loss -> renderWithDrawable dw $ renderLoss newContext dw
             Playing -> do
                 disconnectPrevious previousCids
-                mfix $ \cids -> defineCallbacks (Context canvas size newBoard) buttonS cids
+                mfix $ \cids -> defineCallbacks newContext cids
                 return ()
 
     return True
 
 renderBoardCB :: Context -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EExpose Bool
-renderBoardCB (Context _ size board) previousCids = do
+renderBoardCB context previousCids = do
     dw      <- eventWindow
     region  <- eventRegion >>= liftIO . regionGetRectangles
-    liftIO . renderWithDrawable dw $ renderBoard size dw board
+    liftIO . renderWithDrawable dw $ renderBoard context dw
     return True
 
 -- Render
-renderBoard :: Double -> DrawWindow -> Board -> Render()
-renderBoard size dw (Board rows) = mapM_ (renderRowOfBoard size dw) (zip [0..] rows)
+renderBoard :: Context -> DrawWindow -> Render()
+renderBoard context dw =
+    let
+        (Board rows) = board context
+        s = size context
+    in mapM_ (renderRowOfBoard s dw) (zip [0..] rows)
     where
         renderRowOfBoard :: Double -> DrawWindow -> (Int, [Cell]) -> Render ()
         renderRowOfBoard size dw (r, row) = mapM_ (renderCell size dw r) (zip [0..] row)
@@ -165,9 +172,9 @@ renderBoard size dw (Board rows) = mapM_ (renderRowOfBoard size dw) (zip [0..] r
                 lineTo (x+size-1) y
                 stroke
 
-renderWin :: Board -> Render()
-renderWin board = liftIO $ putStrLn "Win!"
+renderWin :: Context -> DrawWindow -> Render()
+renderWin _ _ = liftIO $ putStrLn "Win!"
 
-renderLoss :: Board -> Render()
-renderLoss board = liftIO $ putStrLn "Loss!"
+renderLoss :: Context -> DrawWindow -> Render()
+renderLoss _ _ = liftIO $ putStrLn "Loss!"
 
