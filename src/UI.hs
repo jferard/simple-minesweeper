@@ -45,6 +45,6 @@ class Monad m => UI a m where
                 let c = ord(colChar) - ord('a')
                 let r = ord(rowChar) - ord('0')
                 case command of
-                    [] -> game ui (if cellIsMasked board (r, c) then unmaskCell board (r, c) else setCell board (r, c) Masked)
-                    ('x':_) -> game ui (setCell board (r, c) Cross)
-                    ('?':_) -> game ui (setCell board (r, c) Question)
+                    [] -> game ui (if cellIsMasked board (r, c) then unmaskCell board (r, c) else setTile board (r, c) Masked)
+                    ('x':_) -> game ui (setTile board (r, c) Cross)
+                    ('?':_) -> game ui (setTile board (r, c) Question)

@@ -67,7 +67,7 @@ defineCallbacks :: Context -> Button -> (ConnectId Button, ConnectId DrawingArea
 defineCallbacks context@(Context canvas _ _) buttonS previousCids = do
     liftIO $ putStrLn "redefine callbacks: should disconnect previous event handlers"
     sCid <- onClicked buttonS $ do
-        board@(Board bombGrid maskGrid) <- initBoard 10 10 10
+        board <- initBoard 10 10 10
         startGame canvas board buttonS
         return ()
 
@@ -87,12 +87,12 @@ buttonPressCB context@(Context canvas size board) buttonS previousCids = do
     (x, y)      <- eventCoordinates
     button <- eventButton
     let (c, r) = (floor $ x / size, floor $ y / size)
-    let newBoard@(Board bombGrid maskGrid) = case button of
+    let newBoard@(Board rows) = case button of
                         LeftButton -> (if cellIsMasked board (r, c) then unmaskCell board (r, c) else board)
-                        RightButton -> (setCell board (r, c) BaseTypes.Cross)
+                        RightButton -> (setTile board (r, c) BaseTypes.Cross)
 
     liftIO . renderWithDrawable dw $
-        mapM_ (renderRowOfBoard size dw) (zip3 [0..] bombGrid maskGrid)
+        mapM_ (renderRowOfBoard size dw) (zip [0..] rows)
     liftIO $ case gameState newBoard of
         Win -> renderWithDrawable dw $ renderWin $ board
         Loss -> renderWithDrawable dw $ renderLoss $ board
@@ -110,37 +110,37 @@ renderLoss :: Board -> Render()
 renderLoss board = liftIO $ putStrLn "Loss!"
 
 renderBoardCB :: Context -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EExpose Bool
-renderBoardCB (Context _ size (Board bombGrid maskGrid)) previousCids = do
+renderBoardCB (Context _ size (Board rows)) previousCids = do
     dw      <- eventWindow
     region  <- eventRegion >>= liftIO . regionGetRectangles
     liftIO . renderWithDrawable dw $
-        mapM_ (renderRowOfBoard size dw) (zip3 [0..] bombGrid maskGrid)
+        mapM_ (renderRowOfBoard size dw) (zip [0..] rows)
 
     return True
 
-renderRowOfBoard :: Double -> DrawWindow -> (Int, [Int], [Tile]) -> Render ()
-renderRowOfBoard size dw (r, bombRow, maskRow) = mapM_ (renderCell size dw r) (zip3 [0..] bombRow maskRow)
+renderRowOfBoard :: Double -> DrawWindow -> (Int, [Cell]) -> Render ()
+renderRowOfBoard size dw (r, row) = mapM_ (renderCell size dw r) (zip [0..] row)
 
-renderCell :: Double -> DrawWindow -> Int -> (Int, Int, Tile) -> Render ()
-renderCell size dw r (c, bomb, mask) = do
-    renderTile size r c mask
+renderCell :: Double -> DrawWindow -> Int -> (Int, Cell) -> Render ()
+renderCell size dw r (c, cell) = do
+    renderTile size r c cell
     setSourceRGB 0 0 0
     let x = (fromIntegral c)*size+size*0.30 :: Double
     let y = (fromIntegral r)*size+size*0.75 :: Double
     moveTo x y
-    case (bomb, mask) of
+    case (bomb cell, tile cell) of
         (b, Unmasked) | b >= 0 -> setSourceRGB (0.2*(fromIntegral b)) (1-0.2*(fromIntegral b)) 0
         _  -> setSourceRGB  0 0 0
-    showText $ showCell bomb mask
+    showText $ show cell
 
     where
-        renderTile :: Double -> Int -> Int -> Tile -> Render()
-        renderTile size r c mask =
+        renderTile :: Double -> Int -> Int -> Cell -> Render()
+        renderTile size r c cell =
             let x = (fromIntegral c)*size
                 y = (fromIntegral r)*size
             in do
                 liftIO $ do drawWindowClearArea dw (floor x) (floor y) (ceiling $ x+size-1) (ceiling $ y+size-1)
-                case mask of
+                case (tile cell) of
                     Unmasked -> return()
                     _ -> do
                                 setSourceRGB 0.7 0.7 0.7
@@ -160,12 +160,3 @@ renderCell size dw r (c, bomb, mask) = do
                 lineTo (x+size-1) (y+size-1)
                 lineTo (x+size-1) y
                 stroke
-
-        showCell :: Int -> Tile -> String
-        showCell b m = case (b, m) of
-                        (_, Masked) -> ""
-                        (_, Question) -> "?"
-                        (_, BaseTypes.Cross) -> "X"
-                        (0, Unmasked) -> " "
-                        (-1, Unmasked) -> "B"
-                        (x, Unmasked) -> show x

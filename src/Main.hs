@@ -15,3 +15,4 @@ main :: IO ()
 main = do
     board <- initBoard 10 10 10
     GUI.initGame GUI 25 board
+    -- UI.game TUI board
