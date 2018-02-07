@@ -63,20 +63,29 @@ startGame :: DrawingArea -> Board -> Button -> IO (ConnectId Button, ConnectId D
 startGame canvas board buttonS = do
     mfix $ \cids -> defineCallbacks (Context canvas 30 board) buttonS cids
 
+-- Callbacks. We keep a reference on connect ids to disconnect before every new call.
 defineCallbacks :: Context -> Button -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> IO (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea)
 defineCallbacks context@(Context canvas _ _) buttonS previousCids = do
-    liftIO $ putStrLn "redefine callbacks: should disconnect previous event handlers"
-    sCid <- onClicked buttonS $ do
-        board <- initBoard 10 10 10
-        startGame canvas board buttonS
-        return ()
-
+    liftIO $ putStrLn "redefine callbacks: should disconnect event handlers before a new call"
+    sCid <- on buttonS buttonPressEvent $ startCB context buttonS previousCids
     bCid <- on canvas buttonPressEvent $ buttonPressCB context buttonS previousCids
     eCid <- on canvas exposeEvent $ renderBoardCB context previousCids
     return (sCid, bCid, eCid)
 
+startCB :: Context -> Button -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EButton Bool
+startCB context@(Context canvas size _) buttonS previousCids = do
+        liftIO $ do
+            dw <- drawingAreaGetDrawWindow canvas
+            disconnectPrevious previousCids
+            board <- initBoard 10 10 10
+            renderWithDrawable dw $ renderBoard size dw board
+            startGame canvas board buttonS
+        return True
+
+
 disconnectPrevious :: (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> IO()
 disconnectPrevious (sCid, bCid, eCid) = do
+    liftIO $ putStrLn "disconnect event handlers"
     signalDisconnect sCid
     signalDisconnect bCid
     signalDisconnect eCid
@@ -87,59 +96,54 @@ buttonPressCB context@(Context canvas size board) buttonS previousCids = do
     (x, y)      <- eventCoordinates
     button <- eventButton
     let (c, r) = (floor $ x / size, floor $ y / size)
-    let newBoard@(Board rows) = case button of
+    let newBoard = case button of
                         LeftButton -> (if cellIsMasked board (r, c) then unmaskCell board (r, c) else board)
                         RightButton -> (setTile board (r, c) BaseTypes.Cross)
 
-    liftIO . renderWithDrawable dw $
-        mapM_ (renderRowOfBoard size dw) (zip [0..] rows)
-    liftIO $ case gameState newBoard of
-        Win -> renderWithDrawable dw $ renderWin $ board
-        Loss -> renderWithDrawable dw $ renderLoss $ board
-        Playing -> do
-            disconnectPrevious previousCids
-            mfix $ \cids -> defineCallbacks (Context canvas size newBoard) buttonS cids
-            return ()
+    liftIO $ do
+        renderWithDrawable dw $ renderBoard size dw newBoard
+        case gameState newBoard of
+            Win -> renderWithDrawable dw $ renderWin $ board
+            Loss -> renderWithDrawable dw $ renderLoss $ board
+            Playing -> do
+                disconnectPrevious previousCids
+                mfix $ \cids -> defineCallbacks (Context canvas size newBoard) buttonS cids
+                return ()
 
     return True
-
-renderWin :: Board -> Render()
-renderWin board = liftIO $ putStrLn "Win!"
-
-renderLoss :: Board -> Render()
-renderLoss board = liftIO $ putStrLn "Loss!"
 
 renderBoardCB :: Context -> (ConnectId Button, ConnectId DrawingArea, ConnectId DrawingArea) -> EventM EExpose Bool
-renderBoardCB (Context _ size (Board rows)) previousCids = do
+renderBoardCB (Context _ size board) previousCids = do
     dw      <- eventWindow
     region  <- eventRegion >>= liftIO . regionGetRectangles
-    liftIO . renderWithDrawable dw $
-        mapM_ (renderRowOfBoard size dw) (zip [0..] rows)
-
+    liftIO . renderWithDrawable dw $ renderBoard size dw board
     return True
 
-renderRowOfBoard :: Double -> DrawWindow -> (Int, [Cell]) -> Render ()
-renderRowOfBoard size dw (r, row) = mapM_ (renderCell size dw r) (zip [0..] row)
-
-renderCell :: Double -> DrawWindow -> Int -> (Int, Cell) -> Render ()
-renderCell size dw r (c, cell) = do
-    renderTile size r c cell
-    setSourceRGB 0 0 0
-    let x = (fromIntegral c)*size+size*0.30 :: Double
-    let y = (fromIntegral r)*size+size*0.75 :: Double
-    moveTo x y
-    case (bomb cell, tile cell) of
-        (b, Unmasked) | b >= 0 -> setSourceRGB (0.2*(fromIntegral b)) (1-0.2*(fromIntegral b)) 0
-        _  -> setSourceRGB  0 0 0
-    showText $ show cell
-
+-- Render
+renderBoard :: Double -> DrawWindow -> Board -> Render()
+renderBoard size dw (Board rows) = mapM_ (renderRowOfBoard size dw) (zip [0..] rows)
     where
+        renderRowOfBoard :: Double -> DrawWindow -> (Int, [Cell]) -> Render ()
+        renderRowOfBoard size dw (r, row) = mapM_ (renderCell size dw r) (zip [0..] row)
+
+        renderCell :: Double -> DrawWindow -> Int -> (Int, Cell) -> Render ()
+        renderCell size dw r (c, cell) = do
+            renderTile size r c cell
+            setSourceRGB 0 0 0
+            let x = (fromIntegral c)*size+size*0.30 :: Double
+            let y = (fromIntegral r)*size+size*0.75 :: Double
+            moveTo x y
+            case (bomb cell, tile cell) of
+                (b, Unmasked) | b >= 0 -> setSourceRGB (0.2*(fromIntegral b)) (1-0.2*(fromIntegral b)) 0
+                _  -> setSourceRGB  0 0 0
+            showText $ show cell
+
         renderTile :: Double -> Int -> Int -> Cell -> Render()
         renderTile size r c cell =
             let x = (fromIntegral c)*size
                 y = (fromIntegral r)*size
             in do
-                liftIO $ do drawWindowClearArea dw (floor x) (floor y) (ceiling $ x+size-1) (ceiling $ y+size-1)
+                liftIO $ drawWindowClearArea dw (floor x) (floor y) (ceiling $ x+size-1) (ceiling $ y+size-1)
                 case (tile cell) of
                     Unmasked -> return()
                     _ -> do
@@ -160,3 +164,10 @@ renderCell size dw r (c, cell) = do
                 lineTo (x+size-1) (y+size-1)
                 lineTo (x+size-1) y
                 stroke
+
+renderWin :: Board -> Render()
+renderWin board = liftIO $ putStrLn "Win!"
+
+renderLoss :: Board -> Render()
+renderLoss board = liftIO $ putStrLn "Loss!"
+
