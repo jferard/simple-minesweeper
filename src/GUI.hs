@@ -150,7 +150,7 @@ renderBoard context dw =
             let x = (fromIntegral c)*size
                 y = (fromIntegral r)*size
             in do
-                liftIO $ drawWindowClearArea dw (floor x) (floor y) (ceiling $ x+size-1) (ceiling $ y+size-1)
+                liftIO $ drawWindowClearArea dw (floor x) (floor y) (ceiling $ size-1) (ceiling $ size-1)
                 case (tile cell) of
                     Unmasked -> return()
                     _ -> do
@@ -173,8 +173,15 @@ renderBoard context dw =
                 stroke
 
 renderWin :: Context -> DrawWindow -> Render()
-renderWin _ _ = liftIO $ putStrLn "Win!"
+renderWin context dw = do
+    liftIO $ drawWindowClearArea dw 100 100 150 70
+    moveTo 150 150
+    showText "Board Complete"
+
 
 renderLoss :: Context -> DrawWindow -> Render()
-renderLoss _ _ = liftIO $ putStrLn "Loss!"
+renderLoss context dw = do
+    liftIO $ drawWindowClearArea dw 100 100 150 70
+    moveTo 150 150
+    showText "BOOM!!!"
 
