@@ -9,7 +9,6 @@ import System.Environment
 import Logic
 import TUI
 import GUI
-import UI
 
 -- let's start.
 main :: IO ()    
@@ -20,4 +19,4 @@ main = do
                 ["tui"] -> "tui"
                 _ -> "gui"
 
-    if ui == "tui" then UI.game TUI board else GUI.initGame GUI 10 board
+    if ui == "tui" then TUI.game board else GUI.initGame GUI 10 board

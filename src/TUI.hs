@@ -7,27 +7,29 @@ import System.Process
 import BaseTypes
 import Data.Char
 import Logic
-import UI
 
 data TUI = TUI
 
-instance UI TUI IO where
-    nextStep tui = do
-        clearScreen
+nextStep :: IO ()
+nextStep = do
+    clearScreen
 
-    getCommandLine tui = (map toLower) <$> getLine
+getCommandLine :: IO String
+getCommandLine = (map toLower) <$> getLine
 
-    renderInitialBoard tui board = do
-        clearScreen
-        putStrLn $ show board
 
-    renderWin tui board = do
-        putStrLn "Board Complete"
+renderBoard :: Board -> IO ()
+renderBoard board = do
+    clearScreen
+    putStrLn $ show board
 
-    renderLoss tui board = do
-        putStrLn "BOOM!!!"
+renderWin :: Board -> IO ()
+renderWin board = do
+    putStrLn "Board Complete"
 
-    initGame tui = return()
+renderLoss :: Board -> IO ()
+renderLoss board = do
+    putStrLn "BOOM!!!"
 
 -- clear the screen (Hack for Un*x, Windows)
 clearScreen :: IO ()
@@ -35,3 +37,20 @@ clearScreen = do
     _ <- system "clear"
     _ <- system "cls"
     return()
+
+-- this is the game : clear the screen, draw the board and wait for
+game :: Board -> IO ()
+game board = do
+    renderBoard board
+    case gameState board of
+        Win -> renderWin board
+        Loss -> renderLoss board
+        Playing -> do
+            commandLine <- getCommandLine
+            let (colChar:rowChar:command) = commandLine
+            let c = ord(colChar) - ord('a')
+            let r = ord(rowChar) - ord('0')
+            case command of
+                [] -> game (if cellIsMasked board (r, c) then unmaskCell board (r, c) else setTile board (r, c) Masked)
+                ('x':_) -> game (setTile board (r, c) Cross)
+                ('?':_) -> game (setTile board (r, c) Question)
