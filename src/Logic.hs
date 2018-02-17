@@ -2,11 +2,12 @@ module Logic where
 
 import System.Random
 import BaseTypes
+import Debug.Trace
 
 initBoard :: Int -> Int -> Int -> IO Board
 initBoard bombCount rows columns = do
     gen <- newStdGen
-    let bombsCoordinates = createBombsCoordinates gen bombCount
+    let bombsCoordinates = createBombsCoordinates gen rows columns bombCount
     let board = createBoard rows columns bombsCoordinates
     return board
 
@@ -73,21 +74,24 @@ setTile (Board rows) (r, c) value = Board $ befRows ++ [setInRow row c value] ++
                     where
                         (befCells, cell:aftCells) = splitAt c row
 
--- given a StdGen and a count, return n coordinates. May loop forever.
-createBombsCoordinates :: StdGen -> Int -> [(Int, Int)]
-{-
-type StdGen = Int
-createBombsCoordinates x n = [(1,2), (4,6), (4,7), (5,5), (9,8), (3,3), (4,2)]
--}
-createBombsCoordinates gen' count = createBombsCoordinates' gen' count []
+-- given a StdGen and a count, return n coordinates
+-- Fisher Yates shuffle
+createBombsCoordinates :: StdGen -> Int -> Int -> Int -> [(Int, Int)]
+createBombsCoordinates gen rows columns count =
+    let
+        size = rows * columns
+        initialArr = map (\i -> i<count) [0..size] -- count Trues then Falses
+    in convert $ shuffle gen (size - 1) initialArr
     where
-    createBombsCoordinates' :: StdGen -> Int -> [(Int, Int)] -> [(Int, Int)]
-    createBombsCoordinates' _ 0 coords = coords
-    createBombsCoordinates' g n coords = if (r, c) `elem` coords then createBombsCoordinates' g'' n coords else createBombsCoordinates' g'' (n-1) ((r, c):coords)
+    -- probably equivalent to System.Random.Shuffle.shuffle'
+    shuffle :: StdGen -> Int -> [a] -> [a]
+    shuffle _ 0 array = array
+    shuffle g i array =
+        let (j, g') = randomR (0,i) g
+        in shuffle g' (i-1) (exchange j i array)
         where
-            r :: Int
-            c :: Int
-            (r, g') = randomR (0,9) g
-            (c, g'') = randomR (0,9) g'
-
+            exchange :: Int -> Int -> [a] -> [a]
+            exchange j i arr = zipWith (\k element -> if k == j then arr!!i else if k == i then arr!!j else element) [0..] arr
+    convert :: [Bool] -> [(Int, Int)]
+    convert arr = [divMod i columns | (i,b)<-zip [0..] arr, b]
 
